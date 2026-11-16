@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#123c3a">
+<title>大富翁</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{--bg:#123c3a;--paper:#fbf4e4;--ink:#2b2b2b;--accent:#e85d3f;--gold:#f2b544;--green:#2f7d6d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:radial-gradient(circle at 50% 0,#1d5a55,var(--bg) 60%);background-attachment:fixed;color:var(--ink);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;min-height:100vh}
+#app{max-width:560px;margin:0 auto;padding:8px 8px calc(20px + env(safe-area-inset-bottom))}
+h3{margin:0 0 8px;font-size:16px}
+.card{background:var(--paper);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 4px 0 rgba(0,0,0,.25)}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:13px;font-size:16px;font-weight:700;background:var(--accent);color:#fff;margin:8px 0;box-shadow:0 3px 0 #a63a22;font-family:inherit;cursor:pointer}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #a63a22}
+.btn.alt{background:var(--green);box-shadow:0 3px 0 #1d5146}
+.btn.ghost{background:#e9dfc8;color:#333;box-shadow:0 3px 0 #c7b994}
+.btn:disabled{opacity:.4;pointer-events:none}
+.mini{border:0;border-radius:8px;padding:6px 10px;font-size:13px;background:rgba(255,255,255,.15);color:#fff;font-family:inherit;cursor:pointer}
+.mini.warn{background:var(--accent)}
+.mini.dark{background:#ddd0b0;color:#333}
+input,select{width:100%;font-size:16px;padding:11px;border-radius:10px;border:2px solid #d9cba8;background:#fff;margin:6px 0;font-family:inherit}
+label{font-size:13px;color:#666}
+.row{display:flex;gap:8px;align-items:center}
+.row input{flex:1}
+.row .btn{width:auto;padding:12px 20px;margin:6px 0}
+.row2{display:flex;gap:6px}.row2 .btn{flex:1}
+.hint{font-size:12px;color:#777;margin:4px 0}
+.hero{text-align:center;color:#fff;padding:22px 0 6px}
+.hero .logo{font-size:46px}
+.hero h1{font-size:40px;margin:0;letter-spacing:6px;color:var(--gold);text-shadow:0 3px 0 #7a4b0c}
+.hero p{margin:6px 0;opacity:.85}
+.top{display:flex;align-items:center;gap:8px;color:#fff;font-size:13px;padding:2px 0 8px;flex-wrap:wrap}
+.top .sp{flex:1}
+.code{font-size:56px;font-weight:900;letter-spacing:10px;color:var(--accent);text-align:center}
+.ct{text-align:center}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+.lp{padding:8px 0;border-bottom:1px dashed #d9cba8;font-size:16px}
+.lp:last-child{border:0}
+/* board */
+.board{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(7,1fr);gap:2px;width:100%;aspect-ratio:1;background:#0b2a28;padding:3px;border-radius:12px;box-shadow:0 6px 0 rgba(0,0,0,.3)}
+.cell{background:var(--paper);border-radius:4px;position:relative;overflow:hidden;font-size:clamp(9px,2.7vw,13px);display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.15;cursor:pointer;min-width:0}
+.cell.corner{background:#f6e7c4}
+.band{width:100%;height:17%;flex:none}
+.nm{font-weight:800;margin-top:2px;white-space:nowrap}
+.pr{font-size:.78em;color:#777;white-space:nowrap}
+.lv{font-size:.72em;letter-spacing:-2px;white-space:nowrap}
+.ic{font-size:1.5em;margin-top:6%}
+.tks{position:absolute;bottom:2px;left:0;right:0;display:flex;flex-wrap:wrap;justify-content:center;gap:1px;padding:0 1px}
+.tk{width:14px;height:14px;border-radius:50%;border:1.5px solid #fff;font-size:8px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.tk.me{animation:bob 1s infinite alternate}
+@keyframes bob{to{transform:translateY(-3px)}}
+.cell.here{outline:3px solid var(--gold);outline-offset:-3px}
+.center{grid-row:2/7;grid-column:2/7;background:#e7efe2;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 10px;gap:3px;text-align:center;overflow:hidden}
+.turn{font-size:15px;font-weight:800}
+.dice{display:flex;gap:6px}
+.die{font-size:46px;line-height:1;color:#222;display:inline-block}
+.die.roll{animation:roll .55s ease-out}
+@keyframes roll{0%{transform:rotate(0) scale(.5)}60%{transform:rotate(300deg) scale(1.2)}100%{transform:rotate(360deg) scale(1)}}
+.msg{font-size:12.5px;color:#444;min-height:2.4em;max-height:3.6em;overflow:hidden}
+.cardmsg{font-size:12.5px;background:#fff3c4;border:2px solid var(--gold);border-radius:8px;padding:4px 8px;max-height:4.2em;overflow:hidden}
+.actions{width:100%}
+.actions .btn{padding:9px;font-size:14px;margin:4px 0}
+.big{font-size:44px}
+/* players */
+.players{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
+.pl{background:var(--paper);border-radius:10px;padding:7px 9px;border-left:7px solid;font-size:13px}
+.pl.turn{box-shadow:0 0 0 3px var(--gold)}
+.pl.out{opacity:.4}
+.pn{font-weight:800}
+.pc{font-size:17px;font-weight:900;color:var(--green)}
+.ps{font-size:11.5px;color:#666}
+.log{max-height:220px;overflow:auto;font-size:13px}
+.log div{padding:3px 0;border-bottom:1px dotted #e0d4b4}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.modal.hidden{display:none}
+.sheet{background:var(--paper);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:85vh;overflow:auto;animation:up .2s}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+.sheet h2{margin:4px 0 8px}
+.gband{display:inline-block;padding:2px 10px;border-radius:20px;color:#fff;font-size:12px;font-weight:700}
+.rt{width:100%;border-collapse:collapse;font-size:14px}
+.rt td{padding:5px 2px;border-bottom:1px dashed #d9cba8}
+.rt td:last-child{text-align:right;font-weight:700}
+.toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:20;max-width:90vw;text-align:center}
+.toast.hidden{display:none}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal" class="modal hidden" onclick="if(event.target===this)closeModal()"><div class="sheet" id="sheet"></div></div>
+<div id="toast" class="toast hidden"></div>
+<script>
+// ==ENGINE START==
+// 遊戲規則引擎：只由房主（或單機模式）執行，其他手機只接收狀態
+const START_CASH = 15000, PASS_GO = 2000, JAIL_FINE = 500, JAIL_POS = 6, MAX_LEVEL = 4;
+const COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00897b'];
+const GROUPS = [
+  { name: '東北', color: '#a1887f' },
+  { name: '花東澎', color: '#4fc3f7' },
+  { name: '南部', color: '#f06292' },
+  { name: '中部', color: '#ffb74d' },
+  { name: '桃竹苗', color: '#81c784' },
+  { name: '雙北', color: '#7986cb' },
+];
+const BOARD = [
+  { t: 'start', n: '起點' },
+  { t: 'prop', n: '基隆', g: 0, p: 600 },
+  { t: 'prop', n: '宜蘭', g: 0, p: 700 },
+  { t: 'chance', n: '機會' },
+  { t: 'prop', n: '花蓮', g: 1, p: 1000 },
+  { t: 'prop', n: '台東', g: 1, p: 1000 },
+  { t: 'jail', n: '監獄' },
+  { t: 'prop', n: '澎湖', g: 1, p: 1200 },
+  { t: 'prop', n: '屏東', g: 2, p: 1400 },
+  { t: 'chance', n: '機會' },
+  { t: 'prop', n: '台南', g: 2, p: 1400 },
+  { t: 'prop', n: '高雄', g: 2, p: 1600 },
+  { t: 'park', n: '公園' },
+  { t: 'prop', n: '嘉義', g: 3, p: 1800 },
+  { t: 'prop', n: '彰化', g: 3, p: 1800 },
+  { t: 'tax', n: '所得稅', amt: 1000 },
+  { t: 'prop', n: '台中', g: 3, p: 2000 },
+  { t: 'prop', n: '苗栗', g: 4, p: 2200 },
+  { t: 'gotojail', n: '入獄' },
+  { t: 'prop', n: '新竹', g: 4, p: 2200 },
+  { t: 'prop', n: '桃園', g: 4, p: 2400 },
+  { t: 'chance', n: '機會' },
+  { t: 'prop', n: '新北', g: 5, p: 2800 },
+  { t: 'prop', n: '台北', g: 5, p: 3200 },
+];
+const RENT_MULT = [1, 5, 15, 30, 45]; // 空地、1~3 棟房子、飯店
+const CARDS = [
+  { text: '前進到起點，領取 2000 元', k: 'goto', v: 0 },
+  { text: '統一發票中獎，獲得 1000 元', k: 'gain', v: 1000 },
+  { text: '闖紅燈被開罰單，繳 600 元', k: 'pay', v: 600 },
+  { text: '今天是你生日！每位玩家送你 300 元', k: 'birthday', v: 300 },
+  { text: '請大家吃雞排，付給每位玩家 200 元', k: 'treat', v: 200 },
+  { text: '搭上順風車，前進 3 格', k: 'step', v: 3 },
+  { text: '忘了帶錢包，後退 3 格', k: 'step', v: -3 },
+  { text: '逃漏稅被查到，直接入獄', k: 'jail' },
+  { text: '獲得「出獄許可證」，可以留著之後用', k: 'jailcard' },
+  { text: '房屋修繕：每棟房子付 250 元，每間飯店付 1000 元', k: 'repair' },
+  { text: '搭高鐵直達台北', k: 'goto', v: 23 },
+  { text: '去高雄看演唱會', k: 'goto', v: 11 },
+  { text: '股票大漲，獲利 1500 元', k: 'gain', v: 1500 },
+  { text: '颱風來襲，修理費 800 元', k: 'pay', v: 800 },
+  { text: '撿到錢包送警局，獲得獎金 500 元', k: 'gain', v: 500 },
+  { text: '健保補充保費，繳 400 元', k: 'pay', v: 400 },
+];
+
+let s; // 目前處理中的狀態
+const P = id => s.players.find(p => p.id === id);
+const cur = () => s.players[s.turn];
+function log(msg) { s.log.push(msg); if (s.log.length > 60) s.log.shift(); }
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const round10 = x => Math.round(x / 10) * 10;
+const baseRent = i => round10(BOARD[i].p * 0.1);
+const buildCost = i => round10(BOARD[i].p * 0.5);
+const validIdx = i => Number.isInteger(i) && BOARD[i] && BOARD[i].t === 'prop';
+function groupIdx(g) { const r = []; BOARD.forEach((b, i) => { if (b.t === 'prop' && b.g === g) r.push(i); }); return r; }
+function ownsGroup(st, pid, g) { return !!pid && groupIdx(g).every(i => st.props[i].owner === pid); }
+function rentOf(st, i) {
+  const pr = st.props[i]; let r = baseRent(i) * RENT_MULT[pr.level];
+  if (pr.level === 0 && ownsGroup(st, pr.owner, BOARD[i].g)) r *= 2;
+  return r;
+}
+function netWorth(st, p) {
+  let w = p.cash;
+  for (const k in st.props) { const pr = st.props[k]; if (pr.owner === p.id) w += BOARD[k].p + pr.level * buildCost(+k); }
+  return w;
+}
+function canBuild(st, pid, i) {
+  const b = BOARD[i], pr = st.props[i], p = st.players.find(x => x.id === pid);
+  if (!pr || pr.owner !== pid) return '這不是你的地';
+  if (pr.level >= MAX_LEVEL) return '已經蓋到飯店了';
+  if (!ownsGroup(st, pid, b.g)) return `要集滿「${GROUPS[b.g].name}」所有地產才能蓋房子`;
+  const minLv = Math.min(...groupIdx(b.g).map(j => st.props[j].level));
+  if (pr.level > minLv) return '要平均蓋：先蓋同區房子比較少的地';
+  if (p.cash < buildCost(i)) return '現金不夠';
+  return '';
+}
+function canSell(st, pid, i) {
+  const b = BOARD[i], pr = st.props[i];
+  if (!pr || pr.owner !== pid) return '這不是你的地';
+  const lvls = groupIdx(b.g).map(j => st.props[j].owner === pid ? st.props[j].level : 0);
+  if (pr.level > 0 && pr.level < Math.max(...lvls)) return '要平均賣：先賣同區房子比較多的地';
+  if (pr.level === 0 && Math.max(...lvls) > 0) return '要先賣掉同區的房子才能賣地';
+  return '';
+}
+const sellValue = (st, i) => st.props[i].level > 0 ? buildCost(i) / 2 : BOARD[i].p / 2;
+
+function createState(hostId) {
+  return { phase: 'lobby', hostId, players: [], props: {}, turn: 0, startTurn: 0, round: 1, maxRounds: 20,
+    step: 'roll', dice: [1, 1], rollId: 0, doubles: 0, extraRoll: false, pendingBuy: null,
+    log: [], deck: [], lastCard: null, cardId: 0, winner: null };
+}
+function addPlayer(st, id, name) {
+  const used = st.players.map(p => p.color);
+  const color = COLORS.find(c => !used.includes(c)) || COLORS[0];
+  const p = { id, name, color, connected: true, cash: START_CASH, pos: 0, inJail: false, jailTurns: 0, jailCards: 0, bankrupt: false };
+  st.players.push(p);
+  return p;
+}
+function startGame(st) {
+  s = st;
+  s.phase = 'playing'; s.props = {};
+  BOARD.forEach((b, i) => { if (b.t === 'prop') s.props[i] = { owner: null, level: 0 }; });
+  s.players.forEach(p => Object.assign(p, { cash: START_CASH, pos: 0, inJail: false, jailTurns: 0, jailCards: 0, bankrupt: false }));
+  s.turn = Math.floor(Math.random() * s.players.length); s.startTurn = s.turn; s.round = 1;
+  Object.assign(s, { step: 'roll', doubles: 0, extraRoll: false, pendingBuy: null, log: [], lastCard: null, winner: null, dice: [1, 1] });
+  s.deck = shuffle([...CARDS.keys()]);
+  log(`🎲 遊戲開始！每人起始資金 ${START_CASH} 元`);
+  log(`由 ${cur().name} 先擲骰`);
+}
+
+function act(st, pid, a) {
+  s = st;
+  if (s.phase !== 'playing' || !a) return false;
+  const p = P(pid);
+  if (!p || p.bankrupt || cur().id !== pid) return false;
+  switch (a.type) {
+    case 'roll': if (s.step !== 'roll') return false; s.lastCard = null; doRoll(p); break;
+    case 'buy': if (s.step !== 'buy') return false; doBuy(p); break;
+    case 'pass': if (s.step !== 'buy') return false; log(`${p.name} 決定不買${BOARD[s.pendingBuy].n}`); afterLand(p); break;
+    case 'end': if (s.step !== 'end') return false; nextTurn(); break;
+    case 'payJail':
+      if (s.step !== 'roll' || !p.inJail || p.cash < JAIL_FINE) return false;
+      p.cash -= JAIL_FINE; p.inJail = false; p.jailTurns = 0; log(`${p.name} 繳交 ${JAIL_FINE} 元保釋出獄`); break;
+    case 'useCard':
+      if (s.step !== 'roll' || !p.inJail || p.jailCards < 1) return false;
+      p.jailCards--; p.inJail = false; p.jailTurns = 0; log(`${p.name} 使用出獄許可證`); break;
+    case 'build': if (!validIdx(a.idx) || !doBuild(p, a.idx)) return false; break;
+    case 'sell': if (!validIdx(a.idx) || !doSell(p, a.idx)) return false; break;
+    default: return false;
+  }
+  if (s.phase === 'playing' && cur().bankrupt) nextTurn();
+  return true;
+}
+
+function doRoll(p) {
+  const d1 = 1 + Math.floor(Math.random() * 6), d2 = 1 + Math.floor(Math.random() * 6);
+  s.dice = [d1, d2]; s.rollId++;
+  const dbl = d1 === d2;
+  log(`${p.name} 擲出 ${d1} + ${d2} = ${d1 + d2}${dbl ? '（對子！）' : ''}`);
+  if (p.inJail) {
+    if (dbl) { p.inJail = false; p.jailTurns = 0; s.extraRoll = false; log('擲出對子，出獄了！'); move(p, d1 + d2); return; }
+    p.jailTurns++;
+    if (p.jailTurns >= 3) {
+      log(`${p.name} 關滿 3 回合，繳 ${JAIL_FINE} 元出獄`);
+      if (!charge(p, JAIL_FINE, null)) { s.step = 'end'; return; }
+      p.inJail = false; p.jailTurns = 0; s.extraRoll = false; move(p, d1 + d2); return;
+    }
+    log(`${p.name} 沒擲出對子，繼續待在監獄`); s.step = 'end'; return;
+  }
+  if (dbl) {
+    s.doubles++;
+    if (s.doubles >= 3) { log('連續三次對子，超速被抓去坐牢！'); sendToJail(p); s.step = 'end'; return; }
+    s.extraRoll = true;
+  } else s.extraRoll = false;
+  move(p, d1 + d2);
+}
+function move(p, steps) {
+  const old = p.pos;
+  p.pos = (p.pos + steps + BOARD.length) % BOARD.length;
+  if (steps > 0 && p.pos < old) { p.cash += PASS_GO; log(`${p.name} 經過起點，領取 ${PASS_GO} 元`); }
+  land(p);
+}
+function sendToJail(p) { p.pos = JAIL_POS; p.inJail = true; p.jailTurns = 0; s.doubles = 0; s.extraRoll = false; }
+function land(p) {
+  const b = BOARD[p.pos];
+  switch (b.t) {
+    case 'prop': {
+      const pr = s.props[p.pos];
+      if (pr.owner === null) {
+        if (p.cash >= b.p) { s.step = 'buy'; s.pendingBuy = p.pos; log(`${p.name} 來到${b.n}，可以用 ${b.p} 元買下`); return; }
+        log(`${p.name} 來到${b.n}，但現金不夠買`);
+      } else if (pr.owner !== p.id) {
+        const owner = P(pr.owner), r = rentOf(s, p.pos);
+        log(`${p.name} 來到${owner.name}的${b.n}，付過路費 ${r} 元`);
+        charge(p, r, owner);
+      } else log(`${p.name} 回到自己的${b.n}`);
+      break;
+    }
+    case 'tax': log(`${p.name} 繳交所得稅 ${b.amt} 元`); charge(p, b.amt, null); break;
+    case 'chance': drawCard(p); return;
+    case 'gotojail': log(`${p.name} 被警察抓走，直接入獄！`); sendToJail(p); s.step = 'end'; return;
+    case 'park': log(`${p.name} 在公園散步休息`); break;
+    case 'jail': log(`${p.name} 來監獄探監，只是路過`); break;
+    case 'start': break;
+  }
+  afterLand(p);
+}
+function afterLand(p) {
+  s.pendingBuy = null;
+  if (p.bankrupt || s.phase !== 'playing') { s.step = 'end'; return; }
+  if (s.extraRoll && !p.inJail) { s.step = 'roll'; log(`${p.name} 擲出對子，再擲一次！`); }
+  else s.step = 'end';
+}
+function drawCard(p) {
+  if (!s.deck.length) s.deck = shuffle([...CARDS.keys()]);
+  const c = CARDS[s.deck.pop()];
+  s.lastCard = { text: c.text, id: ++s.cardId };
+  log(`🎴 ${p.name} 抽到機會：${c.text}`);
+  const others = s.players.filter(o => o !== p && !o.bankrupt);
+  switch (c.k) {
+    case 'gain': p.cash += c.v; break;
+    case 'pay': charge(p, c.v, null); break;
+    case 'goto':
+      if (c.v <= p.pos) { p.cash += PASS_GO; log(`${p.name} 經過起點，領取 ${PASS_GO} 元`); }
+      p.pos = c.v; land(p); return;
+    case 'step': move(p, c.v); return;
+    case 'jail': sendToJail(p); s.step = 'end'; return;
+    case 'jailcard': p.jailCards++; break;
+    case 'birthday': others.forEach(o => charge(o, c.v, p)); break;
+    case 'treat': for (const o of others) { if (!charge(p, c.v, o)) break; } break;
+    case 'repair': {
+      let houses = 0, hotels = 0;
+      for (const k in s.props) { const pr = s.props[k]; if (pr.owner === p.id) { if (pr.level === MAX_LEVEL) hotels++; else houses += pr.level; } }
+      const cost = houses * 250 + hotels * 1000;
+      if (cost) { log(`${p.name} 要付修繕費 ${cost} 元`); charge(p, cost, null); }
+      break;
+    }
+  }
+  afterLand(p);
+}
+// 付錢；不夠時自動變賣，還不夠就破產。回傳 true 表示付清
+function charge(p, amt, creditor) {
+  if (p.cash < amt) raise(p, amt);
+  if (p.cash >= amt) { p.cash -= amt; if (creditor) creditor.cash += amt; return true; }
+  if (creditor) creditor.cash += p.cash;
+  p.cash = 0; bankrupt(p);
+  return false;
+}
+function raise(p, need) {
+  while (p.cash < need) {
+    const mine = Object.keys(s.props).map(Number).filter(i => s.props[i].owner === p.id);
+    if (!mine.length) break;
+    const withB = mine.filter(i => s.props[i].level > 0).sort((a, b) => s.props[b].level - s.props[a].level);
+    if (withB.length) {
+      const i = withB[0], v = buildCost(i) / 2; s.props[i].level--; p.cash += v;
+      log(`💸 ${p.name} 現金不足，變賣${BOARD[i].n}的建築（+${v}）`); continue;
+    }
+    const i = mine.sort((a, b) => BOARD[a].p - BOARD[b].p)[0], v = BOARD[i].p / 2;
+    s.props[i].owner = null; p.cash += v;
+    log(`💸 ${p.name} 現金不足，把${BOARD[i].n}賣回銀行（+${v}）`);
+  }
+}
+function bankrupt(p) {
+  p.bankrupt = true; p.cash = 0; p.inJail = false;
+  for (const k in s.props) if (s.props[k].owner === p.id) { s.props[k].owner = null; s.props[k].level = 0; }
+  log(`💀 ${p.name} 破產出局！`);
+  const alive = s.players.filter(x => !x.bankrupt);
+  if (alive.length <= 1) { s.phase = 'over'; s.winner = alive[0] ? alive[0].id : null; if (alive[0]) log(`🏆 ${alive[0].name} 成為大富翁！`); }
+}
+function doBuy(p) {
+  const i = s.pendingBuy, b = BOARD[i];
+  if (p.cash < b.p) return;
+  p.cash -= b.p; s.props[i].owner = p.id;
+  log(`🏷️ ${p.name} 用 ${b.p} 元買下${b.n}`);
+  if (ownsGroup(s, p.id, b.g)) log(`✨ ${p.name} 集滿「${GROUPS[b.g].name}」，過路費加倍，可以蓋房子了！`);
+  afterLand(p);
+}
+function doBuild(p, i) {
+  if (canBuild(s, p.id, i)) return false;
+  const cost = buildCost(i), pr = s.props[i];
+  p.cash -= cost; pr.level++;
+  log(`🏠 ${p.name} 在${BOARD[i].n}${pr.level === MAX_LEVEL ? '蓋了飯店' : `蓋了第 ${pr.level} 棟房子`}（-${cost}）`);
+  return true;
+}
+function doSell(p, i) {
+  if (canSell(s, p.id, i)) return false;
+  const pr = s.props[i], v = sellValue(s, i);
+  if (pr.level > 0) { pr.level--; log(`${p.name} 賣掉${BOARD[i].n}的一棟建築（+${v}）`); }
+  else { pr.owner = null; log(`${p.name} 把${BOARD[i].n}賣回銀行（+${v}）`); }
+  p.cash += v;
+  return true;
+}
+function nextTurn() {
+  s.doubles = 0; s.extraRoll = false; s.pendingBuy = null;
+  if (s.phase !== 'playing') return;
+  const n = s.players.length;
+  do { s.turn = (s.turn + 1) % n; if (s.turn === s.startTurn) s.round++; } while (s.players[s.turn].bankrupt);
+  if (s.maxRounds && s.round > s.maxRounds) {
+    const ranked = s.players.filter(p => !p.bankrupt).sort((a, b) => netWorth(s, b) - netWorth(s, a));
+    s.phase = 'over'; s.winner = ranked[0].id; s.round = s.maxRounds;
+    log(`⏰ ${s.maxRounds} 回合結束！比總資產`);
+    log(`🏆 ${ranked[0].name} 以總資產 ${netWorth(s, ranked[0])} 元成為大富翁！`);
+    return;
+  }
+  s.step = 'roll';
+  log(`—— 輪到 ${cur().name} ——`);
+}
+// ==ENGINE END==
+
+// ===== 介面與連線 =====
+const ID_PREFIX = 'baodao-tycoon-v1-';
+const DIE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const ICONS = { start: '🏁', chance: '❓', jail: '⛓️', park: '🌳', gotojail: '👮', tax: '💸' };
+const $ = q => document.querySelector(q);
+const app = $('#app');
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+const myId = store.get('bt_cid') || (() => { const v = 'p' + Math.random().toString(36).slice(2, 10); store.set('bt_cid', v); return v; })();
+let myName = store.get('bt_name') || '';
+let mode = null;        // 'host' | 'guest' | 'local'
+let view = 'home';      // home | localSetup | connecting | lobby | game
+let state = null;
+let peer = null, hostConn = null, roomCode = '', lost = false;
+const conns = new Map(); // connectionId -> { conn, pid }
+let openIdx = null, lastRollShown = 0, lastTurnKey = '', localNames = [], wakeLock = null;
+
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const PS = id => state.players.find(p => p.id === id);
+const curP = () => state.players[state.turn];
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.add('hidden'), 2600);
+}
+function canControl(pid) {
+  if (mode === 'local') return true;
+  if (pid === myId) return true;
+  const p = PS(pid);
+  return mode === 'host' && p && !p.connected; // 房主可以替斷線玩家代打
+}
+function rc(i) {
+  if (i <= 6) return [6, 6 - i];
+  if (i <= 12) return [12 - i, 0];
+  if (i <= 18) return [0, i - 12];
+  return [i - 18, 6];
+}
+const roundsLabel = n => n ? `${n} 回合（比總資產）` : '不限（玩到剩一人）';
+function roundsSelect(attr = '') {
+  const v = state ? state.maxRounds : 20;
+  return `<label>遊戲長度</label><select id="rounds" ${attr}>${[10, 20, 30, 0].map(n => `<option value="${n}" ${n === v ? 'selected' : ''}>${roundsLabel(n)}</option>`).join('')}</select>`;
+}
+function saveName() {
+  const el = $('#name');
+  if (el) myName = el.value.trim().slice(0, 10);
+  if (!myName) { toast('請先輸入暱稱'); el && el.focus(); return false; }
+  store.set('bt_name', myName); return true;
+}
+function peerReady() {
+  if (typeof Peer === 'undefined') { toast('連線元件載入失敗，請確認網路後重新整理'); return false; }
+  return true;
+}
+function errMsg(e) {
+  return ({ 'browser-incompatible': '這個瀏覽器不支援連線', network: '網路連線有問題', 'server-error': '配對伺服器暫時無法使用', 'peer-unavailable': '找不到這個房間', 'socket-error': '網路連線有問題' })[e.type] || e.type;
+}
+async function requestWake() {
+  try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (mode) requestWake();
+  if (mode === 'guest' && lost) reconnect();
+});
+window.addEventListener('beforeunload', e => { if (mode === 'host' && state && state.phase === 'playing') { e.preventDefault(); e.returnValue = ''; } });
+
+// ----- 房主 -----
+function hostRoom() {
+  if (!saveName() || !peerReady()) return;
+  mode = 'host'; state = createState(myId); addPlayer(state, myId, myName);
+  view = 'connecting'; render(); tryHost(0);
+}
+function tryHost(attempt) {
+  roomCode = String(1000 + Math.floor(Math.random() * 9000));
+  peer = new Peer(ID_PREFIX + roomCode);
+  peer.on('open', () => { view = 'lobby'; render(); requestWake(); });
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id' && attempt < 5) { peer.destroy(); tryHost(attempt + 1); return; }
+    toast('連線錯誤：' + errMsg(e));
+    if (view === 'connecting') goHome();
+  });
+  peer.on('disconnected', () => { setTimeout(() => { if (peer && !peer.destroyed && peer.disconnected) try { peer.reconnect(); } catch (e) {} }, 1500); });
+  peer.on('connection', conn => {
+    conn.on('data', d => onHostData(conn, d));
+    conn.on('close', () => onHostClose(conn));
+    conn.on('error', () => onHostClose(conn));
+  });
+}
+function onHostData(conn, d) {
+  if (!d || typeof d !== 'object' || !state) return;
+  if (d.t === 'join') {
+    const cid = String(d.cid || '').slice(0, 40), name = String(d.name || '玩家').trim().slice(0, 10) || '玩家';
+    if (!cid || cid === myId) { conn.send({ t: 'reject', reason: '無法加入' }); return; }
+    let p = PS(cid);
+    if (!p) {
+      if (state.phase !== 'lobby') { conn.send({ t: 'reject', reason: '遊戲已經開始了' }); return; }
+      if (state.players.length >= 6) { conn.send({ t: 'reject', reason: '房間已滿（最多 6 人）' }); return; }
+      p = addPlayer(state, cid, name);
+      toast(`${name} 加入了房間`);
+    } else {
+      if (state.phase === 'lobby') p.name = name;
+      if (!p.connected) toast(`${p.name} 重新連線了`);
+    }
+    for (const [k, v] of conns) if (v.pid === p.id && v.conn !== conn) { conns.delete(k); try { v.conn.close(); } catch (e) {} }
+    conns.set(conn.connectionId, { conn, pid: p.id });
+    p.connected = true;
+    conn.send({ t: 'welcome', pid: p.id });
+    broadcast();
+  } else if (d.t === 'act') {
+    const c = conns.get(conn.connectionId);
+    if (c && act(state, c.pid, d.a)) broadcast();
+  }
+}
+function onHostClose(conn) {
+  const c = conns.get(conn.connectionId);
+  if (!c || !state) return;
+  conns.delete(conn.connectionId);
+  const p = PS(c.pid);
+  if (!p) return;
+  if (state.phase === 'lobby') state.players = state.players.filter(x => x.id !== p.id);
+  else { p.connected = false; toast(`${p.name} 斷線了，輪到他時你可以代打`); }
+  broadcast();
+}
+function broadcast() {
+  const pub = Object.assign({}, state, { deck: undefined });
+  for (const { conn } of conns.values()) { try { if (conn.open) conn.send({ t: 'state', s: pub }); } catch (e) {} }
+  view = state.phase === 'lobby' ? 'lobby' : 'game';
+  render();
+}
+function setRounds(v) { state.maxRounds = +v; broadcast(); }
+function hostStart() {
+  if (state.players.length < 2) return;
+  startGame(state); broadcast();
+}
+function shareInvite() {
+  const url = location.origin + location.pathname + '#' + roomCode;
+  const text = `來玩大富翁！房號 ${roomCode}`;
+  if (navigator.share) navigator.share({ title: '大富翁', text, url }).catch(() => {});
+  else if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => toast('已複製邀請連結'), () => toast(url));
+  else toast(url);
+}
+
+// ----- 玩家（加入房間）-----
+function joinRoom() {
+  const code = ($('#code').value || '').trim();
+  if (!/^\d{4}$/.test(code)) { toast('請輸入 4 位數房號'); return; }
+  if (!saveName() || !peerReady()) return;
+  mode = 'guest'; roomCode = code; view = 'connecting'; render();
+  newGuestPeer();
+}
+function newGuestPeer() {
+  peer = new Peer();
+  peer.on('open', connectHost);
+  peer.on('error', e => {
+    if (e.type === 'peer-unavailable') {
+      if (!state) { toast(`找不到房間 ${roomCode}`); goHome(); }
+      else { lost = true; toast('找不到房主，房主可能離開了'); render(); }
+      return;
+    }
+    toast('連線錯誤：' + errMsg(e));
+    if (!state) goHome(); else { lost = true; render(); }
+  });
+  peer.on('disconnected', () => { setTimeout(() => { if (peer && !peer.destroyed && peer.disconnected) try { peer.reconnect(); } catch (e) {} }, 1500); });
+}
+function connectHost() {
+  hostConn = peer.connect(ID_PREFIX + roomCode, { reliable: true, serialization: 'json' });
+  hostConn.on('open', () => { lost = false; hostConn.send({ t: 'join', cid: myId, name: myName }); requestWake(); });
+  hostConn.on('data', d => {
+    if (!d || mode !== 'guest') return;
+    if (d.t === 'state') { state = d.s; view = state.phase === 'lobby' ? 'lobby' : 'game'; render(); }
+    else if (d.t === 'reject') { toast(d.reason); goHome(); }
+    else if (d.t === 'closed') { toast('房主關閉了房間'); goHome(); }
+  });
+  hostConn.on('close', () => { if (mode === 'guest') { lost = true; render(); } });
+}
+function reconnect() {
+  lost = false; render();
+  if (!peer || peer.destroyed) newGuestPeer();
+  else if (peer.disconnected) { try { peer.reconnect(); } catch (e) {} setTimeout(connectHost, 1200); }
+  else connectHost();
+}
+
+// ----- 單機 -----
+function localSetup() {
+  const el = $('#name'); if (el && el.value.trim()) { myName = el.value.trim().slice(0, 10); store.set('bt_name', myName); }
+  mode = 'local'; state = null; localNames = [myName || '玩家1', '玩家2']; view = 'localSetup'; render();
+}
+function syncLocal() { document.querySelectorAll('.ln').forEach(el => { localNames[+el.dataset.i] = el.value; }); }
+function addLocal() { syncLocal(); if (localNames.length < 6) localNames.push(`玩家${localNames.length + 1}`); render(); }
+function rmLocal(i) { syncLocal(); localNames.splice(i, 1); render(); }
+function startLocal() {
+  syncLocal();
+  const rounds = +$('#rounds').value;
+  state = createState('local');
+  localNames.forEach((n, i) => addPlayer(state, 'L' + i, n.trim().slice(0, 10) || `玩家${i + 1}`));
+  state.maxRounds = rounds;
+  startGame(state); view = 'game'; saveLocal(); render();
+}
+function saveLocal() { if (mode === 'local' && state) store.set('bt_local', JSON.stringify(state)); }
+function loadLocal() { try { const st = JSON.parse(store.get('bt_local')); return st && st.phase === 'playing' ? st : null; } catch (e) { return null; } }
+function resumeLocal() { const st = loadLocal(); if (!st) return; mode = 'local'; state = st; view = 'game'; render(); }
+
+// ----- 共用 -----
+function A(type, idx) {
+  const a = { type, idx };
+  if (mode === 'guest') {
+    if (hostConn && hostConn.open) hostConn.send({ t: 'act', a });
+    else { lost = true; render(); toast('與房主的連線中斷了'); }
+    return;
+  }
+  const c = curP();
+  const pid = canControl(c.id) ? c.id : myId;
+  if (act(state, pid, a)) { if (mode === 'host') broadcast(); else { saveLocal(); render(); } }
+}
+function playAgain() {
+  if (mode === 'local') { startGame(state); saveLocal(); render(); return; }
+  if (mode === 'host') { state.phase = 'lobby'; state.players = state.players.filter(p => p.connected); broadcast(); }
+}
+function leave() {
+  if (state && state.phase === 'playing' && mode !== 'local' && !confirm(mode === 'host' ? '你是房主，離開後遊戲會結束。確定要離開嗎？' : '確定要離開遊戲嗎？')) return;
+  goHome();
+}
+function goHome() {
+  if (mode === 'host') for (const { conn } of conns.values()) { try { conn.send({ t: 'closed' }); } catch (e) {} }
+  const old = peer; peer = null;
+  setTimeout(() => { try { old && old.destroy(); } catch (e) {} }, 300);
+  conns.clear(); hostConn = null; mode = null; state = null; lost = false; view = 'home';
+  closeModal();
+  try { wakeLock && wakeLock.release(); } catch (e) {}
+  if (location.hash) history.replaceState(null, '', location.pathname);
+  render();
+}
+
+// ----- 畫面 -----
+function render() {
+  if (view === 'home') renderHome();
+  else if (view === 'localSetup') renderLocalSetup();
+  else if (view === 'connecting') app.innerHTML = `<div class="hero"><div class="logo">📡</div><h1>大富翁</h1><p>${mode === 'host' ? '建立房間中…' : `正在加入房間 ${esc(roomCode)}…`}</p></div><div class="card"><button class="btn ghost" onclick="goHome()">取消</button></div>`;
+  else if (view === 'lobby') renderLobby();
+  else if (view === 'game') renderGame();
+  if (openIdx !== null) { if (view === 'game') renderModal(); else closeModal(); }
+}
+function renderHome() {
+  const m = location.hash.match(/^#(\d{4})$/), code = m ? m[1] : '';
+  const saved = loadLocal();
+  app.innerHTML = `
+  <div class="hero"><div class="logo">🏝️</div><h1>大富翁</h1><p>面對面用手機連線的大富翁</p></div>
+  <div class="card"><label>你的暱稱</label><input id="name" maxlength="10" placeholder="例如：小明" value="${esc(myName)}"></div>
+  <div class="card">
+    <h3>📶 連線對戰（每人一支手機）</h3>
+    <button class="btn" onclick="hostRoom()">建立房間（我當房主）</button>
+    <div class="row"><input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="輸入 4 位數房號" value="${code}"><button class="btn alt" onclick="joinRoom()">加入</button></div>
+    <p class="hint">需要網路配對。房主的手機就是遊戲主機，遊戲中房主請保持畫面開著、不要切到別的 App。</p>
+  </div>
+  <div class="card">
+    <h3>📱 單機輪流玩</h3>
+    <button class="btn ghost" onclick="localSetup()">一支手機輪流玩</button>
+    ${saved ? '<button class="btn ghost" onclick="resumeLocal()">↩️ 繼續上次的單機遊戲</button>' : ''}
+  </div>
+  <div class="card"><h3>📖 規則</h3><div class="hint" style="font-size:13px;line-height:1.6">
+    擲兩顆骰子前進，停在沒人的地可以買下；停到別人的地要付過路費。集滿同一區的地，過路費加倍，還能蓋房子（最多 3 棟，再升級成飯店）。
+    經過起點領 ${PASS_GO} 元。擲出對子可以再擲一次，連續三次就要坐牢。錢不夠時會自動變賣房產，還不夠就破產。
+    最後剩下的人獲勝；如果有設定回合數，時間到時總資產最多的人獲勝。</div></div>`;
+}
+function renderLocalSetup() {
+  app.innerHTML = `
+  <div class="top"><button class="mini" onclick="goHome()">← 返回</button></div>
+  <div class="card"><h3>玩家（2–6 人）</h3>
+    ${localNames.map((n, i) => `<div class="row"><span class="dot" style="background:${COLORS[i]}"></span><input class="ln" data-i="${i}" maxlength="10" value="${esc(n)}">${localNames.length > 2 ? `<button class="mini dark" onclick="rmLocal(${i})">✕</button>` : ''}</div>`).join('')}
+    ${localNames.length < 6 ? '<button class="btn ghost" onclick="addLocal()">＋ 新增玩家</button>' : ''}
+    ${roundsSelect()}
+    <button class="btn" onclick="startLocal()">開始遊戲</button>
+  </div>`;
+}
+function renderLobby() {
+  const isHost = mode === 'host', n = state.players.length;
+  app.innerHTML = `
+  <div class="top"><button class="mini" onclick="leave()">← 離開</button><span class="sp"></span>${lost ? '<button class="mini warn" onclick="reconnect()">⚠️ 連線中斷，點此重連</button>' : ''}</div>
+  <div class="card ct"><div class="hint">房間號碼</div><div class="code">${esc(roomCode)}</div>
+    ${isHost ? '<p class="hint">請朋友打開同一個網址，輸入這組房號加入</p><button class="btn ghost" onclick="shareInvite()">🔗 分享邀請連結</button>' : ''}</div>
+  <div class="card"><h3>玩家 ${n}/6</h3>
+    ${state.players.map(p => `<div class="lp"><span class="dot" style="background:${p.color}"></span>${esc(p.name)}${p.id === state.hostId ? ' 👑' : ''}${p.id === myId ? '（你）' : ''}</div>`).join('')}</div>
+  <div class="card">${isHost
+    ? `${roundsSelect('onchange="setRounds(this.value)"')}<button class="btn" ${n < 2 ? 'disabled' : ''} onclick="hostStart()">開始遊戲</button>${n < 2 ? '<p class="hint">至少要 2 人才能開始</p>' : ''}`
+    : `<p>遊戲長度：${roundsLabel(state.maxRounds)}</p><p class="hint">等待房主開始遊戲…</p>`}</div>`;
+}
+function tokenLabel(p) {
+  const first = q => [...q.name][0] || '?';
+  const dup = state.players.some(o => o !== p && first(o) === first(p));
+  return dup ? String(state.players.indexOf(p) + 1) : first(p);
+}
+function cellHtml(i) {
+  const b = BOARD[i], [r, c] = rc(i), st = state, cp = curP();
+  let inner = '', style = `grid-row:${r + 1};grid-column:${c + 1};`;
+  if (b.t === 'prop') {
+    const pr = st.props[i], owner = pr && pr.owner ? PS(pr.owner) : null;
+    let sub = `$${b.p}`;
+    if (owner) {
+      sub = pr.level ? `<span class="lv">${pr.level === MAX_LEVEL ? '🏨' : '🏠'.repeat(pr.level)}</span>` : `<span style="color:${owner.color};font-weight:700">$${rentOf(st, i)}</span>`;
+      style += `box-shadow:inset 0 -5px 0 ${owner.color};background:color-mix(in srgb, ${owner.color} 14%, #fbf4e4);`;
+    }
+    inner = `<div class="band" style="background:${GROUPS[b.g].color}"></div><div class="nm">${b.n}</div><div class="pr">${sub}</div>`;
+  } else inner = `<div class="ic">${ICONS[b.t]}</div><div class="nm">${b.n}</div>`;
+  const tks = st.players.filter(p => !p.bankrupt && p.pos === i)
+    .map(p => `<span class="tk${p.id === cp.id && st.phase === 'playing' ? ' me' : ''}" style="background:${p.color}">${esc(tokenLabel(p))}</span>`).join('');
+  const here = st.phase === 'playing' && cp.pos === i ? ' here' : '';
+  return `<div class="cell${i % 6 === 0 ? ' corner' : ''}${here}" style="${style}" onclick="openCell(${i})">${inner}<div class="tks">${tks}</div></div>`;
+}
+function centerHtml() {
+  const st = state, c = curP();
+  if (st.phase === 'over') {
+    const w = st.winner ? PS(st.winner) : null;
+    const rank = st.players.slice().sort((a, b) => netWorth(st, b) - netWorth(st, a))
+      .map((p, k) => `${k + 1}. ${esc(p.name)} $${netWorth(st, p).toLocaleString()}${p.bankrupt ? '（破產）' : ''}`).join('<br>');
+    return `<div class="big">🏆</div><div class="turn">${w ? esc(w.name) + ' 獲勝！' : '遊戲結束'}</div><div class="msg" style="max-height:none">${rank}</div>
+      <div class="actions">${mode !== 'guest' ? '<button class="btn" onclick="playAgain()">再玩一局</button>' : '<div class="hint">等待房主開新局</div>'}</div>`;
+  }
+  const mine = canControl(c.id);
+  const dice = `<div class="dice"><span class="die">${DIE[st.dice[0]]}</span><span class="die">${DIE[st.dice[1]]}</span></div>`;
+  const msg = st.lastCard ? `<div class="cardmsg">🎴 ${esc(st.lastCard.text)}</div>` : `<div class="msg">${esc(st.log[st.log.length - 1] || '')}</div>`;
+  let actions = '';
+  if (mine) {
+    if (st.step === 'roll') {
+      if (c.inJail) actions = `<div class="hint">⛓️ 坐牢中（第 ${c.jailTurns + 1}/3 次）</div><button class="btn" onclick="A('roll')">🎲 擲骰（對子就出獄）</button>
+        <div class="row2"><button class="btn alt" ${c.cash < JAIL_FINE ? 'disabled' : ''} onclick="A('payJail')">付 ${JAIL_FINE} 出獄</button>${c.jailCards ? `<button class="btn alt" onclick="A('useCard')">用出獄卡</button>` : ''}</div>`;
+      else actions = `<button class="btn" onclick="A('roll')">🎲 擲骰子</button>`;
+    } else if (st.step === 'buy') {
+      const b = BOARD[st.pendingBuy];
+      actions = `<button class="btn" onclick="A('buy')">買下${b.n}（$${b.p}）</button><button class="btn ghost" onclick="A('pass')">不買</button>`;
+    } else actions = `<button class="btn alt" onclick="A('end')">結束回合 ➜</button>`;
+    if (GROUPS.some((g, k) => ownsGroup(st, c.id, k))) actions += `<div class="hint">點自己的地可以蓋房子</div>`;
+  } else actions = `<div class="hint">等待 ${esc(c.name)} 行動…</div>`;
+  const youTurn = mode !== 'local' && c.id === myId;
+  return `<div class="turn"><span class="dot" style="background:${c.color}"></span>${youTurn ? '輪到你了！' : '輪到 ' + esc(c.name)}${!c.connected ? '（離線）' : ''}</div>${dice}${msg}<div class="actions">${actions}</div>`;
+}
+function renderGame() {
+  const st = state, c = curP();
+  let cells = '';
+  for (let i = 0; i < BOARD.length; i++) cells += cellHtml(i);
+  const roundTxt = st.maxRounds ? `第 ${st.round}/${st.maxRounds} 回合` : `第 ${st.round} 回合`;
+  const players = st.players.map((p, k) => {
+    const n = Object.values(st.props).filter(pr => pr.owner === p.id).length;
+    const tags = [`🏘️ ${n} 塊地`];
+    if (p.inJail) tags.push('⛓️ 坐牢');
+    if (p.jailCards) tags.push('🎫 ×' + p.jailCards);
+    if (!p.connected && !p.bankrupt) tags.push('📵 離線');
+    if (p.bankrupt) tags.push('💀 破產');
+    return `<div class="pl${k === st.turn && st.phase === 'playing' ? ' turn' : ''}${p.bankrupt ? ' out' : ''}" style="border-color:${p.color}">
+      <div class="pn">${esc(p.name)}${mode !== 'local' && p.id === myId ? '（你）' : ''}${p.id === st.hostId ? ' 👑' : ''}</div>
+      <div class="pc">$${p.cash.toLocaleString()}</div><div class="ps">${tags.join(' · ')}</div></div>`;
+  }).join('');
+  app.innerHTML = `
+  <div class="top"><button class="mini" onclick="leave()">← 離開</button><span>${mode !== 'local' ? '房號 ' + esc(roomCode) + ' · ' : ''}${roundTxt}</span><span class="sp"></span>
+    ${lost ? '<button class="mini warn" onclick="reconnect()">⚠️ 連線中斷，點此重連</button>' : ''}</div>
+  <div class="board">${cells}<div class="center">${centerHtml()}</div></div>
+  <div class="players">${players}</div>
+  <div class="card log"><h3>📜 紀錄</h3>${st.log.slice().reverse().map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
+  if (st.rollId !== lastRollShown) {
+    if (lastRollShown) document.querySelectorAll('.die').forEach(d => d.classList.add('roll'));
+    lastRollShown = st.rollId;
+  }
+  const key = st.phase + ':' + st.turn + ':' + st.round;
+  if (key !== lastTurnKey) {
+    lastTurnKey = key;
+    if (mode !== 'local' && st.phase === 'playing' && c.id === myId) { try { navigator.vibrate && navigator.vibrate(150); } catch (e) {} }
+  }
+}
+const DESC = {
+  start: `每次經過或停在起點，可以領 ${PASS_GO} 元。`,
+  chance: '抽一張機會卡，可能是好事，也可能是壞事。',
+  jail: `停在這裡只是探監。被關進來的人要擲出對子、付 ${JAIL_FINE} 元或用出獄許可證才能出來，最多關 3 回合。`,
+  park: '免費休息區，什麼事都不會發生。',
+  gotojail: '停在這裡會直接被送進監獄，不會經過起點領錢。',
+  tax: '停在這裡要繳 1000 元所得稅。',
+};
+function openCell(i) { openIdx = i; renderModal(); $('#modal').classList.remove('hidden'); }
+function closeModal() { openIdx = null; $('#modal').classList.add('hidden'); }
+function renderModal() {
+  const i = openIdx, b = BOARD[i], st = state;
+  if (!st) return closeModal();
+  let h = '';
+  if (b.t !== 'prop') h = `<h2>${ICONS[b.t]} ${b.n}</h2><p>${DESC[b.t]}</p>`;
+  else {
+    const pr = st.props[i] || { owner: null, level: 0 }, owner = pr.owner ? PS(pr.owner) : null, base = baseRent(i);
+    h = `<span class="gband" style="background:${GROUPS[b.g].color}">${GROUPS[b.g].name}</span><h2>${b.n}</h2>
+    <table class="rt"><tr><td>地價</td><td>$${b.p}</td></tr><tr><td>過路費（空地）</td><td>$${base}</td></tr>
+    <tr><td>集滿同區（空地）</td><td>$${base * 2}</td></tr>
+    ${[1, 2, 3].map(l => `<tr><td>${'🏠'.repeat(l)} ${l} 棟房子</td><td>$${base * RENT_MULT[l]}</td></tr>`).join('')}
+    <tr><td>🏨 飯店</td><td>$${base * RENT_MULT[4]}</td></tr><tr><td>每次蓋房費用</td><td>$${buildCost(i)}</td></tr></table>
+    <p>擁有者：${owner ? `<span class="dot" style="background:${owner.color}"></span>${esc(owner.name)}（${pr.level === MAX_LEVEL ? '飯店' : pr.level + ' 棟房子'}，目前過路費 <b>$${rentOf(st, i)}</b>）` : '還沒有人買'}</p>`;
+    if (st.phase === 'playing' && owner && owner.id === curP().id && canControl(owner.id)) {
+      const rb = canBuild(st, owner.id, i), rs = canSell(st, owner.id, i);
+      if (pr.level < MAX_LEVEL) h += `<button class="btn" ${rb ? 'disabled' : ''} onclick="A('build',${i})">🏠 ${pr.level === 3 ? '升級成飯店' : '蓋一棟房子'}（-$${buildCost(i)}）</button>${rb ? `<p class="hint">${rb}</p>` : ''}`;
+      h += `<button class="btn ghost" ${rs ? 'disabled' : ''} onclick="A('sell',${i})">${pr.level > 0 ? '賣掉一棟建築' : '把地賣回銀行'}（+$${sellValue(st, i)}）</button>${rs ? `<p class="hint">${rs}</p>` : ''}`;
+    } else if (owner && canControl(owner.id) && st.phase === 'playing') h += '<p class="hint">輪到自己的回合時，可以在這裡蓋房子或變賣</p>';
+  }
+  h += '<button class="btn ghost" onclick="closeModal()">關閉</button>';
+  $('#sheet').innerHTML = h;
+}
+render();
+</script>
+</body>
+</html>
