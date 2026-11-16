@@ -48,17 +48,32 @@ label{font-size:13px;color:#666}
 .pr{font-size:.78em;color:#777;white-space:nowrap}
 .lv{font-size:.72em;letter-spacing:-2px;white-space:nowrap}
 .ic{font-size:1.5em;margin-top:6%}
-.tks{position:absolute;bottom:2px;left:0;right:0;display:flex;flex-wrap:wrap;justify-content:center;gap:1px;padding:0 1px}
-.tk{width:14px;height:14px;border-radius:50%;border:1.5px solid #fff;font-size:8px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;box-shadow:0 1px 2px rgba(0,0,0,.4)}
-.tk.me{animation:bob 1s infinite alternate}
-@keyframes bob{to{transform:translateY(-3px)}}
-.cell.here{outline:3px solid var(--gold);outline-offset:-3px}
 .center{grid-row:2/7;grid-column:2/7;background:#e7efe2;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 10px;gap:3px;text-align:center;overflow:hidden}
 .turn{font-size:15px;font-weight:800}
-.dice{display:flex;gap:6px}
-.die{font-size:46px;line-height:1;color:#222;display:inline-block}
-.die.roll{animation:roll .55s ease-out}
-@keyframes roll{0%{transform:rotate(0) scale(.5)}60%{transform:rotate(300deg) scale(1.2)}100%{transform:rotate(360deg) scale(1)}}
+/* dice */
+.dice{display:flex;gap:10px;margin:2px 0 4px}
+.die{width:44px;height:44px;background:#fff;border-radius:10px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:7px;gap:2px;box-shadow:inset 0 -4px 0 #e2dccd,0 3px 6px rgba(0,0,0,.25)}
+.die i{border-radius:50%}
+.die i.on{background:#2b2b2b}
+.die.one i.on{background:#e53935;transform:scale(1.3)}
+.die.rolling{animation:tumble .24s linear infinite}
+.die.rolling+.die.rolling{animation-direction:reverse;animation-duration:.2s}
+@keyframes tumble{0%{transform:translateY(0) rotate(0)}50%{transform:translateY(-12px) rotate(180deg)}100%{transform:translateY(0) rotate(360deg)}}
+.die.land{animation:land .35s ease-out}
+@keyframes land{0%{transform:scale(1.3)}60%{transform:scale(.9)}100%{transform:scale(1)}}
+/* pieces */
+.board{position:relative}
+.pieces{position:absolute;inset:3px;pointer-events:none;z-index:5}
+.piece{position:absolute;width:6.2%;transform:translate(-50%,-92%);transition:left .2s ease,top .2s ease}
+.piece.snap{transition:none!important}
+.pawn{width:100%;transform-origin:50% 100%}
+.pawn svg{display:block;width:100%;height:auto;overflow:visible;filter:drop-shadow(0 2px 1.5px rgba(0,0,0,.5))}
+.piece.active .pawn{animation:bob .8s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translateY(-16%)}}
+.float{position:absolute;transform:translate(-50%,-200%);color:#1b8a3a;font-weight:900;font-size:14px;text-shadow:0 0 3px #fff,0 0 3px #fff;animation:floatup 1.1s ease-out forwards;white-space:nowrap}
+@keyframes floatup{to{transform:translate(-50%,-420%);opacity:0}}
+.pawnmini{display:inline-block;width:14px;vertical-align:-3px;margin-right:5px}
+.moving{color:#555}
 .msg{font-size:12.5px;color:#444;min-height:2.4em;max-height:3.6em;overflow:hidden}
 .cardmsg{font-size:12.5px;background:#fff3c4;border:2px solid var(--gold);border-radius:8px;padding:4px 8px;max-height:4.2em;overflow:hidden}
 .actions{width:100%}
@@ -195,7 +210,7 @@ const sellValue = (st, i) => st.props[i].level > 0 ? buildCost(i) / 2 : BOARD[i]
 function createState(hostId) {
   return { phase: 'lobby', hostId, players: [], props: {}, turn: 0, startTurn: 0, round: 1, maxRounds: 20,
     step: 'roll', dice: [1, 1], rollId: 0, doubles: 0, extraRoll: false, pendingBuy: null,
-    log: [], deck: [], lastCard: null, cardId: 0, winner: null };
+    log: [], deck: [], lastCard: null, cardId: 0, winner: null, gameId: 0, moves: [], moveId: 0 };
 }
 function addPlayer(st, id, name) {
   const used = st.players.map(p => p.color);
@@ -206,7 +221,7 @@ function addPlayer(st, id, name) {
 }
 function startGame(st) {
   s = st;
-  s.phase = 'playing'; s.props = {};
+  s.phase = 'playing'; s.props = {}; s.gameId = (s.gameId || 0) + 1; s.moves = []; s.moveId = s.moveId || 0;
   BOARD.forEach((b, i) => { if (b.t === 'prop') s.props[i] = { owner: null, level: 0 }; });
   s.players.forEach(p => Object.assign(p, { cash: START_CASH, pos: 0, inJail: false, jailTurns: 0, jailCards: 0, bankrupt: false }));
   s.turn = Math.floor(Math.random() * s.players.length); s.startTurn = s.turn; s.round = 1;
@@ -262,13 +277,20 @@ function doRoll(p) {
   } else s.extraRoll = false;
   move(p, d1 + d2);
 }
+// 記錄每一段移動，讓所有手機都能播放棋子動畫
+function rec(p, from, to, kind) {
+  s.moveId = (s.moveId || 0) + 1;
+  s.moves.push({ id: s.moveId, pid: p.id, from, to, kind });
+  if (s.moves.length > 20) s.moves.shift();
+}
 function move(p, steps) {
   const old = p.pos;
   p.pos = (p.pos + steps + BOARD.length) % BOARD.length;
+  rec(p, old, p.pos, steps > 0 ? 'walk' : 'back');
   if (steps > 0 && p.pos < old) { p.cash += PASS_GO; log(`${p.name} 經過起點，領取 ${PASS_GO} 元`); }
   land(p);
 }
-function sendToJail(p) { p.pos = JAIL_POS; p.inJail = true; p.jailTurns = 0; s.doubles = 0; s.extraRoll = false; }
+function sendToJail(p) { rec(p, p.pos, JAIL_POS, 'jump'); p.pos = JAIL_POS; p.inJail = true; p.jailTurns = 0; s.doubles = 0; s.extraRoll = false; }
 function land(p) {
   const b = BOARD[p.pos];
   switch (b.t) {
@@ -310,7 +332,7 @@ function drawCard(p) {
     case 'pay': charge(p, c.v, null); break;
     case 'goto':
       if (c.v <= p.pos) { p.cash += PASS_GO; log(`${p.name} 經過起點，領取 ${PASS_GO} 元`); }
-      p.pos = c.v; land(p); return;
+      rec(p, p.pos, c.v, 'walk'); p.pos = c.v; land(p); return;
     case 'step': move(p, c.v); return;
     case 'jail': sendToJail(p); s.step = 'end'; return;
     case 'jailcard': p.jailCards++; break;
@@ -622,6 +644,7 @@ function goHome() {
   const old = peer; peer = null;
   setTimeout(() => { try { old && old.destroy(); } catch (e) {} }, 300);
   conns.clear(); hostConn = null; mode = null; state = null; lost = false; view = 'home';
+  anim.key = null; anim.diceUntil = 0; clearInterval(anim.diceTimer);
   closeModal();
   try { wakeLock && wakeLock.release(); } catch (e) {}
   if (location.hash) history.replaceState(null, '', location.pathname);
@@ -676,7 +699,7 @@ function renderLobby() {
   <div class="card ct"><div class="hint">房間號碼</div><div class="code">${esc(roomCode)}</div>
     ${isHost ? '<p class="hint">請朋友打開同一個網址，輸入這組房號加入</p><button class="btn ghost" onclick="shareInvite()">🔗 分享邀請連結</button>' : ''}</div>
   <div class="card"><h3>玩家 ${n}/6</h3>
-    ${state.players.map(p => `<div class="lp"><span class="dot" style="background:${p.color}"></span>${esc(p.name)}${p.id === state.hostId ? ' 👑' : ''}${p.id === myId ? '（你）' : ''}</div>`).join('')}</div>
+    ${state.players.map(p => `<div class="lp">${pawnMini(p.color)}${esc(p.name)}${p.id === state.hostId ? ' 👑' : ''}${p.id === myId ? '（你）' : ''}</div>`).join('')}</div>
   <div class="card">${isHost
     ? `${roundsSelect('onchange="setRounds(this.value)"')}<button class="btn" ${n < 2 ? 'disabled' : ''} onclick="hostStart()">開始遊戲</button>${n < 2 ? '<p class="hint">至少要 2 人才能開始</p>' : ''}`
     : `<p>遊戲長度：${roundsLabel(state.maxRounds)}</p><p class="hint">等待房主開始遊戲…</p>`}</div>`;
@@ -686,9 +709,145 @@ function tokenLabel(p) {
   const dup = state.players.some(o => o !== p && first(o) === first(p));
   return dup ? String(state.players.indexOf(p) + 1) : first(p);
 }
-function cellHtml(i) {
-  const b = BOARD[i], [r, c] = rc(i), st = state, cp = curP();
-  let inner = '', style = `grid-row:${r + 1};grid-column:${c + 1};`;
+// 棋子（兵的形狀），label 是名字第一個字
+function pawnSvg(color, label) {
+  return `<svg viewBox="0 0 24 30"><path d="M12 1.5a5.2 5.2 0 0 1 3.3 9.2c1.7 1 2.4 2.5 2.4 3.8h-2.3c.3 2.9 1.7 5.7 4.3 7.8.9.7 1.6 1.7 1.6 2.9v1.3H2.7v-1.3c0-1.2.7-2.2 1.6-2.9 2.6-2.1 4-4.9 4.3-7.8H6.3c0-1.3.7-2.8 2.4-3.8A5.2 5.2 0 0 1 12 1.5z" fill="${color}" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>${label ? `<text x="12" y="24" text-anchor="middle" font-size="7.5" font-weight="900" fill="#fff" font-family="sans-serif">${esc(label)}</text>` : ''}</svg>`;
+}
+const pawnMini = color => `<span class="pawnmini">${pawnSvg(color, '')}</span>`;
+const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+const dieHtml = n => `<div class="die${n === 1 ? ' one' : ''}">${[...Array(9)].map((_, k) => `<i${PIPS[n].includes(k) ? ' class="on"' : ''}></i>`).join('')}</div>`;
+function paintDie(el, n) { el.classList.toggle('one', n === 1); el.querySelectorAll('i').forEach((pip, k) => pip.classList.toggle('on', PIPS[n].includes(k))); }
+
+// ----- 動畫狀態 -----
+const anim = { key: null, shown: {}, lastMoveId: 0, busy: false, diceUntil: 0, diceTimer: null };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const isAnimating = () => anim.busy || anim.diceUntil > Date.now() || (state.moves || []).some(m => m.id > anim.lastMoveId);
+function setDice(v, land) {
+  document.querySelectorAll('#dice .die').forEach((d, k) => {
+    d.classList.remove('rolling'); paintDie(d, v[k]);
+    if (land) { d.classList.remove('land'); void d.offsetWidth; d.classList.add('land'); }
+  });
+}
+function rollDice(v) {
+  clearInterval(anim.diceTimer);
+  anim.diceUntil = Date.now() + 850;
+  const ds = document.querySelectorAll('#dice .die');
+  ds.forEach(d => d.classList.add('rolling'));
+  anim.diceTimer = setInterval(() => {
+    if (Date.now() >= anim.diceUntil) {
+      clearInterval(anim.diceTimer); setDice(v, true);
+      try { navigator.vibrate && navigator.vibrate(30); } catch (e) {}
+      return;
+    }
+    ds.forEach(d => paintDie(d, 1 + Math.floor(Math.random() * 6)));
+  }, 80);
+}
+const OFFS = { 1: [[0, 0]], 2: [[-.2, 0], [.2, 0]], 3: [[-.24, 0], [.24, 0], [0, -.17]], 4: [[-.2, 0], [.2, 0], [-.2, -.2], [.2, -.2]] };
+const offsetFor = (j, n) => OFFS[n] ? OFFS[n][j] : [((j % 3) - 1) * .27, -Math.floor(j / 3) * .2];
+function layoutPieces() {
+  if (!state) return;
+  const groups = {};
+  state.players.forEach(p => {
+    if (!p.bankrupt && document.getElementById('pc-' + p.id)) (groups[anim.shown[p.id]] = groups[anim.shown[p.id]] || []).push(p);
+  });
+  for (const pos in groups) {
+    const g = groups[pos], [r, c] = rc(+pos);
+    g.forEach((p, j) => {
+      const [dx, dy] = offsetFor(j, g.length), el = document.getElementById('pc-' + p.id);
+      el.style.left = ((c + .5 + dx) / 7 * 100) + '%';
+      el.style.top = ((r + .95 + dy) / 7 * 100) + '%';
+      if (!el.dataset.moving) el.style.zIndex = String(20 + r * 10 + Math.round(dy * 10));
+    });
+  }
+}
+function syncPieces() {
+  const box = $('#pieces'); if (!box) return;
+  const cp = curP();
+  state.players.forEach(p => {
+    let el = document.getElementById('pc-' + p.id);
+    if (p.bankrupt) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div'); el.className = 'piece snap'; el.id = 'pc-' + p.id;
+      el.innerHTML = `<div class="pawn">${pawnSvg(p.color, tokenLabel(p))}</div>`;
+      box.appendChild(el);
+      if (anim.shown[p.id] === undefined) anim.shown[p.id] = p.pos;
+    }
+    el.classList.toggle('active', state.phase === 'playing' && p.id === cp.id && !isAnimating());
+  });
+  layoutPieces();
+  requestAnimationFrame(() => box.querySelectorAll('.piece.snap').forEach(e => e.classList.remove('snap')));
+}
+function floatText(el, text) {
+  const f = document.createElement('div');
+  f.className = 'float'; f.textContent = text; f.style.left = el.style.left; f.style.top = el.style.top;
+  $('#pieces').appendChild(f); setTimeout(() => f.remove(), 1100);
+}
+async function animateMove(p, m) {
+  const el = document.getElementById('pc-' + p.id); if (!el) return;
+  const pawn = el.querySelector('.pawn');
+  el.dataset.moving = '1'; el.style.zIndex = '200';
+  if (m.kind === 'jump') {
+    await pawn.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(-80%) scale(.2)', opacity: 0 }], { duration: 320, easing: 'ease-in' }).finished.catch(() => {});
+    el.classList.add('snap'); anim.shown[p.id] = m.to; layoutPieces(); void el.offsetWidth; el.classList.remove('snap');
+    await pawn.animate([{ transform: 'translateY(-80%) scale(.2)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 380, easing: 'ease-out' }).finished.catch(() => {});
+  } else {
+    const n = BOARD.length, dir = m.kind === 'back' ? -1 : 1;
+    const len = dir > 0 ? (m.to - m.from + n) % n : (m.from - m.to + n) % n;
+    const stepMs = Math.max(110, Math.min(260, 2600 / Math.max(len, 1)));
+    el.style.transitionDuration = Math.round(stepMs * 0.85) + 'ms';
+    let pos = m.from;
+    for (let k = 0; k < len; k++) {
+      pos = (pos + dir + n) % n; anim.shown[p.id] = pos; layoutPieces();
+      pawn.animate([{ transform: 'none' }, { transform: 'translateY(-40%)' }, { transform: 'none' }], { duration: stepMs * 0.9, easing: 'ease-out' });
+      if (pos === 0 && dir > 0) floatText(el, '+' + PASS_GO);
+      await sleep(stepMs);
+    }
+    el.style.transitionDuration = '';
+  }
+  delete el.dataset.moving; layoutPieces();
+}
+async function runAnim() {
+  if (anim.busy || !state) return;
+  anim.busy = true;
+  let moved = false;
+  try {
+    while (state && view === 'game' && $('#board')) {
+      const wait = anim.diceUntil - Date.now();
+      if (wait > 0) { await sleep(wait + 30); continue; }
+      const m = (state.moves || []).find(x => x.id > anim.lastMoveId);
+      if (m) {
+        anim.lastMoveId = m.id;
+        const p = PS(m.pid);
+        if (!p || !document.getElementById('pc-' + p.id)) continue;
+        if (!moved) { moved = true; syncPieces(); renderCenter(); }
+        if (anim.shown[p.id] !== m.from) { anim.shown[p.id] = m.from; layoutPieces(); }
+        await animateMove(p, m);
+        continue;
+      }
+      const off = state.players.find(p => !p.bankrupt && anim.shown[p.id] !== p.pos);
+      if (off) { anim.shown[off.id] = off.pos; layoutPieces(); }
+      break;
+    }
+  } finally { anim.busy = false; }
+  if (state && view === 'game' && $('#board')) { syncPieces(); renderCenter(); }
+}
+
+// ----- 遊戲畫面 -----
+function ensureBoard() {
+  if ($('#board')) return;
+  let cells = '';
+  for (let i = 0; i < BOARD.length; i++) cells += `<div class="cell" id="c${i}" onclick="openCell(${i})"></div>`;
+  app.innerHTML = `<div class="top" id="gTop"></div>
+  <div class="board" id="board">${cells}
+    <div class="center"><div class="turn" id="turnLine"></div><div class="dice" id="dice">${dieHtml(1)}${dieHtml(1)}</div><div id="centerRest" style="width:100%"></div></div>
+    <div class="pieces" id="pieces"></div></div>
+  <div class="players" id="players"></div>
+  <div class="card log" id="log"></div>`;
+  anim.key = null;
+}
+function updateCell(i) {
+  const b = BOARD[i], [r, c] = rc(i), st = state, el = $('#c' + i);
+  let inner, style = `grid-row:${r + 1};grid-column:${c + 1};`;
   if (b.t === 'prop') {
     const pr = st.props[i], owner = pr && pr.owner ? PS(pr.owner) : null;
     let sub = `$${b.p}`;
@@ -698,25 +857,30 @@ function cellHtml(i) {
     }
     inner = `<div class="band" style="background:${GROUPS[b.g].color}"></div><div class="nm">${b.n}</div><div class="pr">${sub}</div>`;
   } else inner = `<div class="ic">${ICONS[b.t]}</div><div class="nm">${b.n}</div>`;
-  const tks = st.players.filter(p => !p.bankrupt && p.pos === i)
-    .map(p => `<span class="tk${p.id === cp.id && st.phase === 'playing' ? ' me' : ''}" style="background:${p.color}">${esc(tokenLabel(p))}</span>`).join('');
-  const here = st.phase === 'playing' && cp.pos === i ? ' here' : '';
-  return `<div class="cell${i % 6 === 0 ? ' corner' : ''}${here}" style="${style}" onclick="openCell(${i})">${inner}<div class="tks">${tks}</div></div>`;
+  el.className = 'cell' + (i % 6 === 0 ? ' corner' : '');
+  el.style.cssText = style;
+  el.innerHTML = inner;
 }
-function centerHtml() {
-  const st = state, c = curP();
-  if (st.phase === 'over') {
+function renderCenter() {
+  const st = state, c = curP(), tl = $('#turnLine'), rest = $('#centerRest'), dice = $('#dice');
+  if (!tl) return;
+  const animating = isAnimating();
+  if (st.phase === 'over' && !animating) {
     const w = st.winner ? PS(st.winner) : null;
     const rank = st.players.slice().sort((a, b) => netWorth(st, b) - netWorth(st, a))
       .map((p, k) => `${k + 1}. ${esc(p.name)} $${netWorth(st, p).toLocaleString()}${p.bankrupt ? '（破產）' : ''}`).join('<br>');
-    return `<div class="big">🏆</div><div class="turn">${w ? esc(w.name) + ' 獲勝！' : '遊戲結束'}</div><div class="msg" style="max-height:none">${rank}</div>
-      <div class="actions">${mode !== 'guest' ? '<button class="btn" onclick="playAgain()">再玩一局</button>' : '<div class="hint">等待房主開新局</div>'}</div>`;
+    dice.style.display = 'none';
+    tl.innerHTML = `<div class="big">🏆</div>${w ? esc(w.name) + ' 獲勝！' : '遊戲結束'}`;
+    rest.innerHTML = `<div class="msg" style="max-height:none">${rank}</div><div class="actions">${mode !== 'guest' ? '<button class="btn" onclick="playAgain()">再玩一局</button>' : '<div class="hint">等待房主開新局</div>'}</div>`;
+    return;
   }
-  const mine = canControl(c.id);
-  const dice = `<div class="dice"><span class="die">${DIE[st.dice[0]]}</span><span class="die">${DIE[st.dice[1]]}</span></div>`;
+  dice.style.display = '';
+  const youTurn = mode !== 'local' && c.id === myId;
+  tl.innerHTML = `${pawnMini(c.color)}${youTurn ? '輪到你了！' : '輪到 ' + esc(c.name)}${!c.connected ? '（離線）' : ''}`;
+  if (animating) { rest.innerHTML = `<div class="msg moving">${anim.diceUntil > Date.now() ? '🎲 擲骰中…' : '♟️ 移動中…'}</div>`; return; }
   const msg = st.lastCard ? `<div class="cardmsg">🎴 ${esc(st.lastCard.text)}</div>` : `<div class="msg">${esc(st.log[st.log.length - 1] || '')}</div>`;
   let actions = '';
-  if (mine) {
+  if (canControl(c.id)) {
     if (st.step === 'roll') {
       if (c.inJail) actions = `<div class="hint">⛓️ 坐牢中（第 ${c.jailTurns + 1}/3 次）</div><button class="btn" onclick="A('roll')">🎲 擲骰（對子就出獄）</button>
         <div class="row2"><button class="btn alt" ${c.cash < JAIL_FINE ? 'disabled' : ''} onclick="A('payJail')">付 ${JAIL_FINE} 出獄</button>${c.jailCards ? `<button class="btn alt" onclick="A('useCard')">用出獄卡</button>` : ''}</div>`;
@@ -727,15 +891,16 @@ function centerHtml() {
     } else actions = `<button class="btn alt" onclick="A('end')">結束回合 ➜</button>`;
     if (GROUPS.some((g, k) => ownsGroup(st, c.id, k))) actions += `<div class="hint">點自己的地可以蓋房子</div>`;
   } else actions = `<div class="hint">等待 ${esc(c.name)} 行動…</div>`;
-  const youTurn = mode !== 'local' && c.id === myId;
-  return `<div class="turn"><span class="dot" style="background:${c.color}"></span>${youTurn ? '輪到你了！' : '輪到 ' + esc(c.name)}${!c.connected ? '（離線）' : ''}</div>${dice}${msg}<div class="actions">${actions}</div>`;
+  rest.innerHTML = `${msg}<div class="actions">${actions}</div>`;
 }
 function renderGame() {
+  ensureBoard();
   const st = state, c = curP();
-  let cells = '';
-  for (let i = 0; i < BOARD.length; i++) cells += cellHtml(i);
+  for (let i = 0; i < BOARD.length; i++) updateCell(i);
   const roundTxt = st.maxRounds ? `第 ${st.round}/${st.maxRounds} 回合` : `第 ${st.round} 回合`;
-  const players = st.players.map((p, k) => {
+  $('#gTop').innerHTML = `<button class="mini" onclick="leave()">← 離開</button><span>${mode !== 'local' ? '房號 ' + esc(roomCode) + ' · ' : ''}${roundTxt}</span><span class="sp"></span>
+    ${lost ? '<button class="mini warn" onclick="reconnect()">⚠️ 連線中斷，點此重連</button>' : ''}`;
+  $('#players').innerHTML = st.players.map((p, k) => {
     const n = Object.values(st.props).filter(pr => pr.owner === p.id).length;
     const tags = [`🏘️ ${n} 塊地`];
     if (p.inJail) tags.push('⛓️ 坐牢');
@@ -743,22 +908,23 @@ function renderGame() {
     if (!p.connected && !p.bankrupt) tags.push('📵 離線');
     if (p.bankrupt) tags.push('💀 破產');
     return `<div class="pl${k === st.turn && st.phase === 'playing' ? ' turn' : ''}${p.bankrupt ? ' out' : ''}" style="border-color:${p.color}">
-      <div class="pn">${esc(p.name)}${mode !== 'local' && p.id === myId ? '（你）' : ''}${p.id === st.hostId ? ' 👑' : ''}</div>
+      <div class="pn">${pawnMini(p.color)}${esc(p.name)}${mode !== 'local' && p.id === myId ? '（你）' : ''}${p.id === st.hostId ? ' 👑' : ''}</div>
       <div class="pc">$${p.cash.toLocaleString()}</div><div class="ps">${tags.join(' · ')}</div></div>`;
   }).join('');
-  app.innerHTML = `
-  <div class="top"><button class="mini" onclick="leave()">← 離開</button><span>${mode !== 'local' ? '房號 ' + esc(roomCode) + ' · ' : ''}${roundTxt}</span><span class="sp"></span>
-    ${lost ? '<button class="mini warn" onclick="reconnect()">⚠️ 連線中斷，點此重連</button>' : ''}</div>
-  <div class="board">${cells}<div class="center">${centerHtml()}</div></div>
-  <div class="players">${players}</div>
-  <div class="card log"><h3>📜 紀錄</h3>${st.log.slice().reverse().map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
-  if (st.rollId !== lastRollShown) {
-    if (lastRollShown) document.querySelectorAll('.die').forEach(d => d.classList.add('roll'));
-    lastRollShown = st.rollId;
-  }
-  const key = st.phase + ':' + st.turn + ':' + st.round;
-  if (key !== lastTurnKey) {
-    lastTurnKey = key;
+  $('#log').innerHTML = `<h3>📜 紀錄</h3>${st.log.slice().reverse().map(l => `<div>${esc(l)}</div>`).join('')}`;
+  const key = st.hostId + ':' + st.gameId;
+  if (anim.key !== key) {
+    anim.key = key; anim.shown = {}; anim.lastMoveId = st.moveId || 0; anim.diceUntil = 0;
+    clearInterval(anim.diceTimer); lastRollShown = st.rollId;
+    st.players.forEach(p => { anim.shown[p.id] = p.pos; });
+    $('#pieces').innerHTML = ''; setDice(st.dice, false);
+  } else if (st.rollId !== lastRollShown) { lastRollShown = st.rollId; rollDice(st.dice); }
+  syncPieces();
+  renderCenter();
+  runAnim();
+  const tk = st.phase + ':' + st.turn + ':' + st.round;
+  if (tk !== lastTurnKey) {
+    lastTurnKey = tk;
     if (mode !== 'local' && st.phase === 'playing' && c.id === myId) { try { navigator.vibrate && navigator.vibrate(150); } catch (e) {} }
   }
 }
