@@ -79,6 +79,23 @@ label{font-size:13px;color:#666}
 .cardmsg.item{background:#e3f1ff;border-color:#4a90d9}
 .pop{animation:pop .45s ease-out}
 @keyframes pop{0%{transform:scale(.6) rotate(-4deg);opacity:0}60%{transform:scale(1.08) rotate(1deg)}100%{transform:none}}
+/* events */
+.evbar{background:rgba(255,255,255,.12);color:#fff;border-radius:10px;padding:6px 10px;font-size:12.5px;margin:0 0 8px;line-height:1.4}
+.evbar b{color:var(--gold)}
+.evbar.on{background:#fff3c4;color:#5a3d00}
+.evbar.on b{color:#a35a00}
+.emk{position:absolute;top:1px;right:1px;font-size:.85em;line-height:1}
+.evpop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:30;padding:20px}
+.evpop.hidden{display:none}
+.paper{background:#f8f1de;max-width:400px;width:100%;border-radius:6px;padding:18px 18px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-family:"Noto Serif TC","PMingLiU",serif;animation:paperin .55s cubic-bezier(.2,1.4,.4,1);border:1px solid #d8c9a3}
+@keyframes paperin{from{transform:rotate(-12deg) scale(.4);opacity:0}}
+.paper .mast{display:flex;justify-content:space-between;align-items:baseline;border-bottom:3px double #3a2f1d;padding-bottom:6px;font-weight:900;letter-spacing:2px;color:#3a2f1d}
+.paper .mast span:last-child{font-size:13px;letter-spacing:0}
+.paper h2{font-size:30px;margin:12px 0 6px;color:#1f1a10;letter-spacing:2px}
+.paper .dsc{color:#4a3f2a;font-size:15px;margin:0 0 10px}
+.paper .eff{background:#fff;border:2px solid #3a2f1d;border-radius:4px;padding:8px 10px;font-weight:700;color:#7a2e12;font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif;font-size:14px}
+.paper .det{font-size:13px;color:#555;margin:8px 0 0;max-height:120px;overflow:auto;font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif}
+.paper .btn{margin-top:12px;font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif}
 /* hand */
 .hand{margin-top:12px}
 .hand h3{display:flex;align-items:center;gap:4px}
@@ -123,6 +140,7 @@ label{font-size:13px;color:#666}
 <div id="app"></div>
 <div id="modal" class="modal hidden" onclick="if(event.target===this)closeModal()"><div class="sheet" id="sheet"></div></div>
 <div id="toast" class="toast hidden"></div>
+<div id="eventPop" class="evpop hidden"></div>
 <script>
 // ==ENGINE START==
 // 遊戲規則引擎：只由房主（或單機模式）執行，其他手機只接收狀態
@@ -197,6 +215,23 @@ const ITEMS = {
   nhi: { name: '全民健保', icon: '🏥', n: 2, passive: true, desc: '自動生效：下一次要付稅金、罰款、修繕費或保釋金給銀行時，免繳一次。' },
   rent: { name: '租金補貼', icon: '🏘️', n: 2, passive: true, desc: '自動生效：下一次付過路費時，由政府全額補貼（地主照收）。' },
 };
+// 歷史事件：從第 4 回合起每 3 回合發生一次
+const EVENT_EVERY = 3;
+const EVENTS = [
+  { key: 'tenproj', year: '1970 年代', title: '十大建設', desc: '高速公路、港口、機場陸續完工，各地地價跟著上漲。', effect: '每擁有一塊地，地主獲得 300 元。' },
+  { key: 'boom', year: '1980 年代', title: '台灣錢淹腳目', desc: '經濟起飛、外銷暢旺，人人口袋麥克麥克。', effect: '每位玩家獲得 1000 元。' },
+  { key: 'crash', year: '1990', title: '台股萬點泡沫破滅', desc: '股市從一萬兩千多點一路崩跌，資產大縮水。', effect: '每位玩家損失現金的 15%。' },
+  { key: 'nhi', year: '1995', title: '全民健保開辦', desc: '全民納保，看病不再是沉重負擔。', effect: '每位玩家獲得一張「全民健保」政策卡（手牌滿了就沒有）。' },
+  { key: 'quake', year: '1999', title: '921 大地震', desc: '中部受災嚴重，全台投入重建。', effect: '中部地產的建築各少一級；中部每塊地的地主獲得重建補助 500 元。' },
+  { key: 'weekend', year: '2001', title: '全面實施週休二日', desc: '假日變多，國內旅遊大爆發。', effect: '到下次歷史事件前，東北、花東澎的過路費 ×1.5。', mod: { groups: [0, 1], mult: 1.5 } },
+  { key: 'sars', year: '2003', title: 'SARS 疫情', desc: '大家減少出門，各地商圈冷清。', effect: '到下次歷史事件前，所有過路費減半。', mod: { groups: null, mult: 0.5 } },
+  { key: 't101', year: '2004', title: '台北 101 落成', desc: '當時的世界第一高樓啟用，雙北成為國際焦點。', effect: '到下次歷史事件前，雙北的過路費 ×1.5。', mod: { groups: [5], mult: 1.5 } },
+  { key: 'snowtunnel', year: '2006', title: '雪山隧道通車', desc: '台北到宜蘭大幅縮短，東北角觀光人潮湧現。', effect: '到下次歷史事件前，東北的過路費 ×2。', mod: { groups: [0], mult: 2 } },
+  { key: 'hsr', year: '2007', title: '台灣高鐵通車', desc: '西部走廊形成一日生活圈，城市距離拉近。', effect: '到下次歷史事件前，桃竹苗、中部、南部的過路費 ×1.5。', mod: { groups: [2, 3, 4], mult: 1.5 } },
+  { key: 'gfc', year: '2008', title: '全球金融海嘯', desc: '國際金融機構倒閉，房地產市場急凍。', effect: '每擁有一塊地，要付給銀行 200 元。' },
+];
+const nextEventRound = r => r + (EVENT_EVERY - (r - 1) % EVENT_EVERY);
+const eventHits = (st, i) => !!st.eventMod && (st.eventMod.groups === null || st.eventMod.groups.includes(BOARD[i].g));
 const ITEM_DECK = [].concat(...Object.keys(ITEMS).map(k => Array(ITEMS[k].n).fill(k)));
 
 let s; // 目前處理中的狀態
@@ -213,6 +248,7 @@ function ownsGroup(st, pid, g) { return !!pid && groupIdx(g).every(i => st.props
 function rentOf(st, i) {
   const pr = st.props[i]; let r = baseRent(i) * RENT_MULT[pr.level];
   if (pr.level === 0 && ownsGroup(st, pr.owner, BOARD[i].g)) r *= 2;
+  if (eventHits(st, i)) r = round10(r * st.eventMod.mult);
   return r;
 }
 function netWorth(st, p) {
@@ -243,7 +279,7 @@ const sellValue = (st, i) => st.props[i].level > 0 ? buildCost(i) / 2 : BOARD[i]
 function createState(hostId) {
   return { phase: 'lobby', hostId, players: [], props: {}, turn: 0, startTurn: 0, round: 1, maxRounds: 20,
     step: 'roll', dice: [1, 1], rollId: 0, doubles: 0, extraRoll: false, pendingBuy: null,
-    log: [], deck: [], itemDeck: [], itemUsed: false, lastCard: null, cardId: 0, winner: null, gameId: 0, moves: [], moveId: 0 };
+    log: [], deck: [], itemDeck: [], itemUsed: false, event: null, eventMod: null, eventDeck: [], eventId: 0, lastCard: null, cardId: 0, winner: null, gameId: 0, moves: [], moveId: 0 };
 }
 function addPlayer(st, id, name) {
   const used = st.players.map(p => p.color);
@@ -260,6 +296,7 @@ function startGame(st) {
   s.turn = Math.floor(Math.random() * s.players.length); s.startTurn = s.turn; s.round = 1;
   Object.assign(s, { step: 'roll', doubles: 0, extraRoll: false, pendingBuy: null, log: [], lastCard: null, winner: null, dice: [1, 1] });
   s.deck = shuffle([...CARDS.keys()]); s.itemDeck = shuffle(ITEM_DECK.slice()); s.itemUsed = false;
+  s.event = null; s.eventMod = null; s.eventDeck = shuffle([...EVENTS.keys()]); s.eventId = s.eventId || 0;
   log(`🎲 遊戲開始！每人起始資金 ${START_CASH} 元`);
   log(`由 ${cur().name} 先擲骰`);
 }
@@ -528,10 +565,45 @@ function useItem(p, hi, target) {
   }
   return true;
 }
+// ----- 歷史事件 -----
+function triggerEvent() {
+  if (!s.eventDeck || !s.eventDeck.length) s.eventDeck = shuffle([...EVENTS.keys()]);
+  const e = EVENTS[s.eventDeck.pop()];
+  s.eventMod = e.mod ? { groups: e.mod.groups, mult: e.mod.mult, title: e.title, until: nextEventRound(s.round) } : null;
+  const alive = s.players.filter(p => !p.bankrupt);
+  const owned = p => Object.keys(s.props).filter(k => s.props[k].owner === p.id).length;
+  const lines = [];
+  log(`📰 歷史事件（${e.year}）${e.title}：${e.effect}`);
+  switch (e.key) {
+    case 'tenproj': alive.forEach(p => { const v = 300 * owned(p); if (v) { p.cash += v; lines.push(`${p.name} +${v}`); } }); break;
+    case 'boom': alive.forEach(p => { p.cash += 1000; lines.push(`${p.name} +1000`); }); break;
+    case 'crash': alive.forEach(p => { const v = round10(p.cash * 0.15); p.cash -= v; lines.push(`${p.name} −${v}`); }); break;
+    case 'nhi': alive.forEach(p => { if (p.items.length < HAND_MAX) { p.items.push('nhi'); lines.push(`${p.name} 獲得「全民健保」`); } else lines.push(`${p.name} 手牌已滿`); }); break;
+    case 'quake':
+      groupIdx(3).forEach(i => {
+        const pr = s.props[i];
+        if (pr.level > 0) { pr.level--; lines.push(`${BOARD[i].n} 建築少一級`); }
+        if (pr.owner) { const o = P(pr.owner); o.cash += 500; lines.push(`${o.name} 獲得${BOARD[i].n}重建補助 +500`); }
+      });
+      break;
+    case 'gfc':
+      alive.forEach(p => {
+        const v = 200 * owned(p);
+        if (!v) return;
+        lines.push(`${p.name} 付 ${v}`);
+        charge(p, v, null);
+      });
+      break;
+  }
+  if (s.eventMod) lines.push(`效果持續到第 ${s.eventMod.until} 回合`);
+  lines.forEach(l => log('　' + l));
+  s.event = { key: e.key, year: e.year, title: e.title, desc: e.desc, effect: e.effect, details: lines, round: s.round, id: ++s.eventId };
+}
 function nextTurn() {
   s.doubles = 0; s.extraRoll = false; s.pendingBuy = null; s.itemUsed = false;
   if (s.phase !== 'playing') return;
   const n = s.players.length;
+  const startRound = s.round;
   while (true) {
     s.turn = (s.turn + 1) % n;
     if (s.turn === s.startTurn) s.round++;
@@ -546,6 +618,12 @@ function nextTurn() {
     log(`⏰ ${s.maxRounds} 回合結束！比總資產`);
     log(`🏆 ${ranked[0].name} 以總資產 ${netWorth(s, ranked[0])} 元成為大富翁！`);
     return;
+  }
+  // 進入第 4、7、10… 回合時發生歷史事件
+  if (s.round > startRound && s.round > 1 && (s.round - 1) % EVENT_EVERY === 0) {
+    triggerEvent();
+    if (s.phase !== 'playing') return;
+    if (cur().bankrupt) return nextTurn();
   }
   s.step = 'roll';
   log(`—— 輪到 ${cur().name} ——`);
@@ -569,7 +647,7 @@ let view = 'home';      // home | localSetup | connecting | lobby | game
 let state = null;
 let peer = null, hostConn = null, roomCode = '', lost = false;
 const conns = new Map(); // connectionId -> { conn, pid }
-let openIdx = null, openItemK = null, lastCardShown = 0, lastRollShown = 0, lastTurnKey = '', localNames = [], wakeLock = null;
+let openIdx = null, openItemK = null, lastCardShown = 0, lastEventShown = 0, lastRollShown = 0, lastTurnKey = '', localNames = [], wakeLock = null;
 
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const PS = id => state.players.find(p => p.id === id);
@@ -676,7 +754,7 @@ function onHostClose(conn) {
   broadcast();
 }
 function broadcast() {
-  const pub = Object.assign({}, state, { deck: undefined, itemDeck: undefined });
+  const pub = Object.assign({}, state, { deck: undefined, itemDeck: undefined, eventDeck: undefined });
   for (const { conn } of conns.values()) { try { if (conn.open) conn.send({ t: 'state', s: pub }); } catch (e) {} }
   view = state.phase === 'lobby' ? 'lobby' : 'game';
   render();
@@ -781,7 +859,7 @@ function goHome() {
   setTimeout(() => { try { old && old.destroy(); } catch (e) {} }, 300);
   conns.clear(); hostConn = null; mode = null; state = null; lost = false; view = 'home';
   anim.key = null; anim.diceUntil = 0; clearInterval(anim.diceTimer);
-  closeModal();
+  closeModal(); closeEvent();
   try { wakeLock && wakeLock.release(); } catch (e) {}
   if (location.hash) history.replaceState(null, '', location.pathname);
   render();
@@ -816,7 +894,7 @@ function renderHome() {
   </div>
   <div class="card"><h3>📖 規則</h3><div class="hint" style="font-size:13px;line-height:1.6">
     擲兩顆骰子前進，停在沒人的地可以買下；停到別人的地要付過路費。集滿同一區的地，過路費加倍，還能蓋房子（最多 3 棟，再升級成飯店）。
-    經過起點領 ${PASS_GO} 元。停在 📜 政策格、🌳 公園或剛好停在起點，可以抽一張政策卡（振興三倍券、TPASS、社會住宅、禮讓行人…），每回合限用 1 張。擲出對子可以再擲一次，連續三次就要坐牢。錢不夠時會自動變賣房產，還不夠就破產。
+    經過起點領 ${PASS_GO} 元。停在 📜 政策格、🌳 公園或剛好停在起點，可以抽一張政策卡（振興三倍券、TPASS、社會住宅、禮讓行人…），每回合限用 1 張。從第 4 回合起，每 3 回合會發生一件台灣歷史事件（十大建設、高鐵通車、金融海嘯…），影響現金、房產或過路費。擲出對子可以再擲一次，連續三次就要坐牢。錢不夠時會自動變賣房產，還不夠就破產。
     最後剩下的人獲勝；如果有設定回合數，時間到時總資產最多的人獲勝。</div></div>`;
 }
 function renderLocalSetup() {
@@ -966,15 +1044,46 @@ async function runAnim() {
       break;
     }
   } finally { anim.busy = false; }
-  if (state && view === 'game' && $('#board')) { syncPieces(); renderCenter(); renderHand(); if (openItemK !== null) renderItemModal(); }
+  if (state && view === 'game' && $('#board')) { syncPieces(); renderCenter(); renderHand(); if (openItemK !== null) renderItemModal(); maybeShowEvent(); }
 }
 
 // ----- 遊戲畫面 -----
+// ----- 歷史事件畫面 -----
+function renderEventBar() {
+  const el = $('#evbar'), st = state;
+  if (!el) return;
+  if (st.phase !== 'playing') { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const nx = nextEventRound(st.round), last = st.maxRounds && nx > st.maxRounds;
+  const next = last ? '' : `下一個歷史事件：第 ${nx} 回合`;
+  if (st.eventMod) {
+    el.className = 'evbar on';
+    el.innerHTML = `📰 <b>${esc(st.eventMod.title)}</b>：${esc(st.event.effect.replace('到下次歷史事件前，', ''))}${st.eventMod.mult > 1 ? ' 📈' : ' 📉'}<br><span style="font-size:11.5px">${last ? '效果持續到遊戲結束' : `效果持續到第 ${st.eventMod.until} 回合，屆時發生下一個歷史事件`}</span>`;
+  } else {
+    el.className = 'evbar';
+    el.innerHTML = next ? `📰 ${next}（每 ${EVENT_EVERY} 回合一次）` : '📰 已經沒有下一個歷史事件了';
+  }
+}
+function maybeShowEvent() {
+  const st = state;
+  if (!st || view !== 'game' || !st.event || st.event.id === lastEventShown || isAnimating()) return;
+  lastEventShown = st.event.id;
+  const e = st.event, pop = $('#eventPop');
+  pop.innerHTML = `<div class="paper"><div class="mast"><span>寶島日報・號外</span><span>第 ${e.round} 回合</span></div>
+    <h2>${esc(e.title)}</h2><p class="dsc">${esc(e.year)}・${esc(e.desc)}</p>
+    <div class="eff">📰 ${esc(e.effect)}</div>
+    ${e.details && e.details.length ? `<div class="det">${e.details.map(l => esc(l)).join('<br>')}</div>` : ''}
+    <button class="btn" onclick="closeEvent()">知道了</button></div>`;
+  pop.classList.remove('hidden');
+  try { navigator.vibrate && navigator.vibrate([60, 60, 60]); } catch (e) {}
+}
+function closeEvent() { $('#eventPop').classList.add('hidden'); }
 function ensureBoard() {
   if ($('#board')) return;
   let cells = '';
   for (let i = 0; i < BOARD.length; i++) cells += `<div class="cell" id="c${i}" onclick="openCell(${i})"></div>`;
   app.innerHTML = `<div class="top" id="gTop"></div>
+  <div class="evbar" id="evbar"></div>
   <div class="board" id="board">${cells}
     <div class="center"><div class="turn" id="turnLine"></div><div class="dice" id="dice">${dieHtml(1)}${dieHtml(1)}</div><div id="centerRest" style="width:100%"></div></div>
     <div class="pieces" id="pieces"></div></div>
@@ -994,6 +1103,7 @@ function updateCell(i) {
       style += `box-shadow:inset 0 -5px 0 ${owner.color};background:color-mix(in srgb, ${owner.color} 14%, #fbf4e4);`;
     }
     inner = `<div class="band" style="background:${GROUPS[b.g].color}"></div><div class="nm">${b.n}</div><div class="pr">${sub}</div>`;
+    if (eventHits(st, i)) inner += `<span class="emk">${st.eventMod.mult > 1 ? '📈' : '📉'}</span>`;
   } else inner = `<div class="ic">${ICONS[b.t]}</div><div class="nm">${b.n}</div>`;
   el.className = 'cell' + (i % 6 === 0 ? ' corner' : '');
   el.style.cssText = style;
@@ -1061,12 +1171,15 @@ function renderGame() {
     anim.key = key; anim.shown = {}; anim.lastMoveId = st.moveId || 0; anim.diceUntil = 0;
     clearInterval(anim.diceTimer); lastRollShown = st.rollId;
     st.players.forEach(p => { anim.shown[p.id] = p.pos; });
+    lastEventShown = st.event ? st.event.id : 0;
     $('#pieces').innerHTML = ''; setDice(st.dice, false);
   } else if (st.rollId !== lastRollShown) { lastRollShown = st.rollId; rollDice(st.dice); }
   syncPieces();
   renderCenter();
   renderHand();
+  renderEventBar();
   runAnim();
+  maybeShowEvent();
   const tk = st.phase + ':' + st.turn + ':' + st.round;
   if (tk !== lastTurnKey) {
     lastTurnKey = tk;
@@ -1136,6 +1249,7 @@ function renderModal() {
     <tr><td>集滿同區（空地）</td><td>$${base * 2}</td></tr>
     ${[1, 2, 3].map(l => `<tr><td>${'🏠'.repeat(l)} ${l} 棟房子</td><td>$${base * RENT_MULT[l]}</td></tr>`).join('')}
     <tr><td>🏨 飯店</td><td>$${base * RENT_MULT[4]}</td></tr><tr><td>每次蓋房費用</td><td>$${buildCost(i)}</td></tr></table>
+    ${eventHits(st, i) ? `<p class="hint" style="color:#a35a00">📰 ${esc(st.eventMod.title)}：過路費 ×${st.eventMod.mult}（已算進下方「目前過路費」）</p>` : ''}
     <p>擁有者：${owner ? `<span class="dot" style="background:${owner.color}"></span>${esc(owner.name)}（${pr.level === MAX_LEVEL ? '飯店' : pr.level + ' 棟房子'}，目前過路費 <b>$${rentOf(st, i)}</b>）` : '還沒有人買'}</p>`;
     if (st.phase === 'playing' && owner && owner.id === curP().id && canControl(owner.id)) {
       const rb = canBuild(st, owner.id, i), rs = canSell(st, owner.id, i);
